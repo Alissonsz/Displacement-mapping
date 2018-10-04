@@ -1,11 +1,11 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <iostream>
 #include <math.h>
-#include "stb_image.h"
-#include "glm/glm/glm.hpp"
-#include "glm/glm/gtc/matrix_transform.hpp"
-#include "glm/glm/gtc/type_ptr.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
+#include "stb_image.h"
 #include "Shader.h"
 #include "Camera.h"
 

@@ -6,7 +6,7 @@
 #include <fstream>
 #include <sstream>
 
-#include "glew.h"
+#include <GL/glew.h>
 #include <GL/gl.h>
 #include <SDL.h>
 #define GLEW_STATIC
