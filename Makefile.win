@@ -5,10 +5,10 @@ OBJS = main.cpp Shader.cpp
 CC = g++
 
 #INCLUDE_PATHS specifies the additional include paths we'll need
-INCLUDE_PATHS = -ISDL2 -Iglew-2.0.0\include\GL
+INCLUDE_PATHS = -ISDL2 
 
 #LIBRARY_PATHS specifies the additional library paths we'll need
-LIBRARY_PATHS = -Lglew-2.0.0\lib
+LIBRARY_PATHS = 
 
 #COMPILER_FLAGS specifies the additional compilation options we're using
  #-w suppresses all warnings
