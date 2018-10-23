@@ -8,7 +8,6 @@
 
 #include <GL/glew.h>
 #include <GL/gl.h>
-#include <SDL.h>
 #define GLEW_STATIC
 
 class Shader{

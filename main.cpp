@@ -1,6 +1,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <iostream>
 #include <math.h>
+#include <SDL.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -9,6 +10,13 @@
 #include "Shader.h"
 #include "Camera.h"
 
+void ClearOpenGLErrors() {
+	GLenum error = glGetError();
+	if(error != GL_NO_ERROR) {
+		std::cout << gluErrorString(error) << std::endl;
+	}
+	
+}
 
 SDL_Window* mainwindow;
 SDL_GLContext maincontext;
@@ -26,16 +34,16 @@ int main(int argc, char* args[]){
 	Init();
 	
 	Shader ourShader("shader.vs", "shader.fs");
-	float lines[] = {
-		0.0f, 0.0f, 0.0f,
-		5.0f, 0.0f, 0.0f,
+	// float lines[] = {
+	// 	0.0f, 0.0f, 0.0f,
+	// 	5.0f, 0.0f, 0.0f,
 
-		0.0f, 0.0f, 0.0f,
-		0.0f, 5.0f, 0.0f, 
+	// 	0.0f, 0.0f, 0.0f,
+	// 	0.0f, 5.0f, 0.0f, 
 
-		0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 5.0f
-	};
+	// 	0.0f, 0.0f, 0.0f,
+	// 	0.0f, 0.0f, 5.0f
+	// };
 
 	std::vector<glm::vec3> vert;
 
@@ -55,37 +63,32 @@ int main(int argc, char* args[]){
 		}
 	}	
 
-	
-
 	unsigned int indices[] = {  // note that we start from 0!
 	    0, 1, 2,    // first triangle
 	    1, 3, 2      // second triangle
 	};
 
-
 	//------------------------------BUFFERS----------------------------------------//
 
 	unsigned int VBO, VAO, EBO;
 	glGenVertexArrays(1, &VAO); 
-	glGenBuffers(1, &VBO);
-	glGenBuffers(1, &EBO);
-
 	glBindVertexArray(VAO);
 
+	glGenBuffers(1, &VBO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	//glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-	glBufferData(GL_ARRAY_BUFFER, vert.size() * sizeof(vert), &vert[0], GL_STATIC_DRAW);
-	
+	glBufferData(GL_ARRAY_BUFFER, 3 * vert.size() * sizeof(float), &vert[0], GL_STATIC_DRAW);
 
+	//glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glGenBuffers(1, &EBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW); 
-
 	//Position attribute
 	
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
 	glEnableVertexAttribArray(0);  
 	
-
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 	
@@ -134,15 +137,13 @@ int main(int argc, char* args[]){
 	glUniformMatrix4fv(projectLoc, 1, GL_FALSE, glm::value_ptr(projection));
 	
 	while(running){
-		if(glGetError() != GL_NO_ERROR){
-			std::cout<<"Erro: "<<gluErrorString(glGetError())<<std::endl;
-		}
+		ClearOpenGLErrors();
 		SDL_Event event;
 		float currentframe = (float)SDL_GetTicks()/100;
 		deltatime = currentframe - lastframe;
 		lastframe = currentframe;
 
-		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+		glClearColor(0.2, 0.3f, 0.3f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
 		ourShader.use();
@@ -152,24 +153,18 @@ int main(int argc, char* args[]){
 		view = camera.GetViewMatrix();
 		unsigned int viewLoc = glGetUniformLocation(ourShader.ID, "view");
 		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-
-
 		glBindVertexArray(VAO);
 	
-		glm::mat4 model;
+		glm::mat4 model = glm::mat4(1.0);
 		unsigned int modelLoc = glGetUniformLocation(ourShader.ID, "model");
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-		
+		ClearOpenGLErrors();
+
 		glDrawArrays(GL_TRIANGLES, 0, vert.size());
-		
-
-		float cameraSpeed = 2.5f * deltatime;
-
-
+		// float cameraSpeed = 2.5f * deltatime;
 		SDL_GL_SwapWindow(mainwindow);
 
-		InputProcess(event);
-		
+		InputProcess(event);	
 	}
 
 	glDeleteVertexArrays(1, &VAO);
@@ -224,34 +219,24 @@ bool Init(){
 }
 
 void InputProcess(SDL_Event event){
+
+	const Uint8* keyboardSnapshot = SDL_GetKeyboardState(NULL);
+
 	while(SDL_PollEvent(&event)){
 		if(event.type == SDL_QUIT)
 			running = false;
-		
-		if(event.type == SDL_KEYDOWN){
-			if(event.key.keysym.scancode == SDL_SCANCODE_UP)
-				camera.ProcessKeyboard(FORWARD, deltatime);
 
-			if(event.key.keysym.scancode == SDL_SCANCODE_DOWN)	
-				camera.ProcessKeyboard(BACKWARD, deltatime);
+		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) running = false;
 
-			if(event.key.keysym.scancode == SDL_SCANCODE_RIGHT)
-				camera.ProcessKeyboard(RIGHT, deltatime);
-
-			if(event.key.keysym.scancode == SDL_SCANCODE_LEFT){
-				camera.ProcessKeyboard(LEFT, deltatime);
-			}	
-			if(event.key.keysym.scancode == SDL_SCANCODE_ESCAPE)
-				running = false;
-			if(event.key.keysym.scancode == SDL_SCANCODE_W)
-				camera.ProcessMouseMovement(0, 10.0f);
-			if(event.key.keysym.scancode == SDL_SCANCODE_S)
-				camera.ProcessMouseMovement(0, -10.0f);
-			if(event.key.keysym.scancode == SDL_SCANCODE_A)		
-				camera.ProcessMouseMovement(10.0f, 0);
-			if(event.key.keysym.scancode == SDL_SCANCODE_D)
-				camera.ProcessMouseMovement(-10.0f, 0);	
-		}
 	}
+
+	if(keyboardSnapshot[SDL_SCANCODE_UP]) camera.ProcessKeyboard(FORWARD, deltatime);
+	if(keyboardSnapshot[SDL_SCANCODE_DOWN]) camera.ProcessKeyboard(BACKWARD, deltatime);
+	if(keyboardSnapshot[SDL_SCANCODE_RIGHT]) camera.ProcessKeyboard(RIGHT, deltatime);
+	if(keyboardSnapshot[SDL_SCANCODE_LEFT]) camera.ProcessKeyboard(LEFT, deltatime);
+	if(keyboardSnapshot[SDL_SCANCODE_W]) camera.ProcessMouseMovement(0, 10.0f);
+	if(keyboardSnapshot[SDL_SCANCODE_S]) camera.ProcessMouseMovement(0, -10.0f);
+	if(keyboardSnapshot[SDL_SCANCODE_D]) camera.ProcessMouseMovement(10.0f, 0);
+	if(keyboardSnapshot[SDL_SCANCODE_A]) camera.ProcessMouseMovement(-10.0f, 0);	
 
 }
