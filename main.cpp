@@ -17,7 +17,7 @@ void ClearOpenGLErrors() {
 	}
 	
 }
-
+std::vector<glm::vec3> vert;
 SDL_Window* mainwindow;
 SDL_GLContext maincontext;
 float deltatime = 0.0f;
@@ -29,70 +29,21 @@ bool Init();
 
 void InputProcess(SDL_Event event);
 
+unsigned int createTerrain();
+
+unsigned int createAxes();
+
 int main(int argc, char* args[]){
 	std::cout<<"start"<<std::endl;
 	Init();
 	
 	Shader ourShader("shader.vs", "shader.fs");
-	// float lines[] = {
-	// 	0.0f, 0.0f, 0.0f,
-	// 	5.0f, 0.0f, 0.0f,
+	Shader our2Shader("shader2.vs", "shader2.fs");
 
-	// 	0.0f, 0.0f, 0.0f,
-	// 	0.0f, 5.0f, 0.0f, 
-
-	// 	0.0f, 0.0f, 0.0f,
-	// 	0.0f, 0.0f, 5.0f
-	// };
-
-	std::vector<glm::vec3> vert;
-
-	float curZ = -15.0;
-	for(int i=0; i<300; i++){
-		curZ+=0.1;
-		float curX = -15.0;
-		for(int j=0; j<300; j++){
-			curX+=0.1f;
-			vert.push_back(glm::vec3(-0.1f + curX, 0.5f, -0.1f + curZ));
-		    vert.push_back(glm::vec3(-0.1f + curX, 0.5f, 0.1f + curZ));
-		    vert.push_back(glm::vec3(0.1f + curX, 0.5f, -0.1f + curZ));
-
-		    vert.push_back(glm::vec3(-0.1f + curX, 0.5f, 0.1f + curZ));
-		    vert.push_back(glm::vec3(0.1f + curX, 0.5f, 0.1f + curZ));
-		    vert.push_back(glm::vec3(0.1f + curX, 0.5f, -0.1f + curZ));	
-		}
-	}	
-
-	unsigned int indices[] = {  // note that we start from 0!
-	    0, 1, 2,    // first triangle
-	    1, 3, 2      // second triangle
-	};
-
-	//------------------------------BUFFERS----------------------------------------//
-
-	unsigned int VBO, VAO, EBO;
-	glGenVertexArrays(1, &VAO); 
-	glBindVertexArray(VAO);
-
-	glGenBuffers(1, &VBO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, 3 * vert.size() * sizeof(float), &vert[0], GL_STATIC_DRAW);
-
-	//glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-	glGenBuffers(1, &EBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW); 
-	//Position attribute
+	unsigned int VAO = createTerrain();
 	
+	unsigned int VAO2 = createAxes();
 
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-	glEnableVertexAttribArray(0);  
-	
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindVertexArray(0);
-	
-	
 	GLuint texture1;
 	glGenTextures(1, &texture1);
 	glBindTexture(GL_TEXTURE_2D, texture1);
@@ -135,6 +86,7 @@ int main(int argc, char* args[]){
 	projection = glm::perspective(glm::radians(45.0f), (float)800/(float)600, 0.1f, 100.0f);
 	unsigned int projectLoc = glGetUniformLocation(ourShader.ID, "projection");
 	glUniformMatrix4fv(projectLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
 	
 	while(running){
 		ClearOpenGLErrors();
@@ -147,13 +99,13 @@ int main(int argc, char* args[]){
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
 		ourShader.use();
-	
+		glBindVertexArray(VAO);
 		glm::mat4 view;
 	
 		view = camera.GetViewMatrix();
 		unsigned int viewLoc = glGetUniformLocation(ourShader.ID, "view");
 		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-		glBindVertexArray(VAO);
+		
 	
 		glm::mat4 model = glm::mat4(1.0);
 		unsigned int modelLoc = glGetUniformLocation(ourShader.ID, "model");
@@ -161,15 +113,27 @@ int main(int argc, char* args[]){
 		ClearOpenGLErrors();
 
 		glDrawArrays(GL_TRIANGLES, 0, vert.size());
-		// float cameraSpeed = 2.5f * deltatime;
+
+		our2Shader.use();
+
+		glBindVertexArray(VAO2);
+
+		projectLoc = glGetUniformLocation(our2Shader.ID, "projection");
+		glUniformMatrix4fv(projectLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
+		viewLoc = glGetUniformLocation(our2Shader.ID, "view");
+		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+
+
+		glDrawArrays(GL_LINES, 0, 12);
+		
 		SDL_GL_SwapWindow(mainwindow);
 
 		InputProcess(event);	
 	}
 
 	glDeleteVertexArrays(1, &VAO);
-	glDeleteBuffers(1, &VBO);
-	glDeleteBuffers(1, &EBO);
+	
 
 	SDL_Quit();
 
@@ -238,5 +202,89 @@ void InputProcess(SDL_Event event){
 	if(keyboardSnapshot[SDL_SCANCODE_S]) camera.ProcessMouseMovement(0, -10.0f);
 	if(keyboardSnapshot[SDL_SCANCODE_D]) camera.ProcessMouseMovement(10.0f, 0);
 	if(keyboardSnapshot[SDL_SCANCODE_A]) camera.ProcessMouseMovement(-10.0f, 0);	
+
+}
+
+unsigned int createTerrain(){
+	
+
+	float curZ = -15.0;
+	for(int i=0; i<300; i++){
+		curZ+=0.1;
+		float curX = -15.0;
+		for(int j=0; j<300; j++){
+			curX+=0.1f;
+			vert.push_back(glm::vec3(-0.1f + curX, 0.5f, -0.1f + curZ));
+		    vert.push_back(glm::vec3(-0.1f + curX, 0.5f, 0.1f + curZ));
+		    vert.push_back(glm::vec3(0.1f + curX, 0.5f, -0.1f + curZ));
+
+		    vert.push_back(glm::vec3(-0.1f + curX, 0.5f, 0.1f + curZ));
+		    vert.push_back(glm::vec3(0.1f + curX, 0.5f, 0.1f + curZ));
+		    vert.push_back(glm::vec3(0.1f + curX, 0.5f, -0.1f + curZ));	
+		}
+	}	
+
+	unsigned int indices[] = {  // note that we start from 0!
+	    0, 1, 2,    // first triangle
+	    1, 3, 2      // second triangle
+	};
+
+	//------------------------------BUFFERS----------------------------------------//
+
+	unsigned int VBO, VAO;
+	glGenVertexArrays(1, &VAO); 
+	glBindVertexArray(VAO);
+
+	glGenBuffers(1, &VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, 3 * vert.size() * sizeof(float), &vert[0], GL_STATIC_DRAW);
+
+
+	//glGenBuffers(1, &EBO);
+	//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	//glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW); 
+	//Position attribute
+	
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);  
+	
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+
+	return VAO;
+}
+
+unsigned int createAxes(){
+	float lines[] = {
+	 	0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+	 	100.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+
+	 	0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+	 	0.0f, 100.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+
+	 	0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+		0.0f, 0.0f, 100.0f, 0.0f, 0.0f, 1.0f 
+	};
+
+	unsigned int VAO, VBO;
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
+
+	glGenBuffers(1, &VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+	glBufferData(GL_ARRAY_BUFFER, sizeof(lines), lines, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)(3*sizeof(float)));
+	glEnableVertexAttribArray(1);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+
+	return VAO;
 
 }
