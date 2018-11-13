@@ -23,6 +23,7 @@ SDL_GLContext maincontext;
 float deltatime = 0.0f;
 float lastframe = 0.0f;
 bool running = true;
+glm::vec3 lightPos(-10.0f, 15.0f, 15.0f);
 Camera camera(glm::vec3(0.0, 5.0f, 6.0f));
 
 bool Init();
@@ -32,6 +33,8 @@ void InputProcess(SDL_Event event);
 unsigned int createTerrain();
 
 unsigned int createAxes();
+
+unsigned int createLamp();
 
 int main(int argc, char* args[]){
 	std::cout<<"start"<<std::endl;
@@ -43,6 +46,8 @@ int main(int argc, char* args[]){
 	unsigned int VAO = createTerrain();
 	
 	unsigned int VAO2 = createAxes();
+
+	unsigned int lampVAO = createLamp();
 
 	GLuint texture1;
 	glGenTextures(1, &texture1);
@@ -77,7 +82,7 @@ int main(int argc, char* args[]){
    
 	ourShader.use();
 	//ourShader.setInt("texture2", 1);
-
+	ourShader.setVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
 
 	glEnable(GL_DEPTH_TEST);
 	
@@ -112,6 +117,10 @@ int main(int argc, char* args[]){
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 		ClearOpenGLErrors();
 
+		ourShader.setVec3("lightPos", lightPos); 
+
+		ourShader.setVec3("viewPos", camera.Position); 
+
 		glDrawArrays(GL_TRIANGLES, 0, vert.size());
 
 		our2Shader.use();
@@ -124,8 +133,33 @@ int main(int argc, char* args[]){
 		viewLoc = glGetUniformLocation(our2Shader.ID, "view");
 		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
+		glm::mat4 model2 = glm::mat4(1.0);
+		/*model2 = glm::translate(model2, glm::vec3(0.0f, 3.0f, 0.0f));
+		model2 = glm::scale(model2, glm::vec3(1.0f));*/
+		modelLoc = glGetUniformLocation(our2Shader.ID, "model");
+		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model2));
+
 
 		glDrawArrays(GL_LINES, 0, 12);
+
+		our2Shader.use();
+
+		glBindVertexArray(lampVAO);
+
+		projectLoc = glGetUniformLocation(our2Shader.ID, "projection");
+		glUniformMatrix4fv(projectLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
+		viewLoc = glGetUniformLocation(our2Shader.ID, "view");
+		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+
+		model2 = glm::mat4(1.0);
+		model2 = glm::translate(model2, lightPos);
+		model2 = glm::scale(model2, glm::vec3(1.0f));
+		modelLoc = glGetUniformLocation(our2Shader.ID, "model");
+		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model2));
+	
+
+		glDrawArrays(GL_TRIANGLES, 0, 36);
 		
 		SDL_GL_SwapWindow(mainwindow);
 
@@ -198,10 +232,14 @@ void InputProcess(SDL_Event event){
 	if(keyboardSnapshot[SDL_SCANCODE_DOWN]) camera.ProcessKeyboard(BACKWARD, deltatime);
 	if(keyboardSnapshot[SDL_SCANCODE_RIGHT]) camera.ProcessKeyboard(RIGHT, deltatime);
 	if(keyboardSnapshot[SDL_SCANCODE_LEFT]) camera.ProcessKeyboard(LEFT, deltatime);
-	if(keyboardSnapshot[SDL_SCANCODE_W]) camera.ProcessMouseMovement(0, 10.0f);
-	if(keyboardSnapshot[SDL_SCANCODE_S]) camera.ProcessMouseMovement(0, -10.0f);
-	if(keyboardSnapshot[SDL_SCANCODE_D]) camera.ProcessMouseMovement(10.0f, 0);
-	if(keyboardSnapshot[SDL_SCANCODE_A]) camera.ProcessMouseMovement(-10.0f, 0);	
+	if(keyboardSnapshot[SDL_SCANCODE_W]) camera.ProcessMouseMovement(0, 10.0f, deltatime);
+	if(keyboardSnapshot[SDL_SCANCODE_S]) camera.ProcessMouseMovement(0, -10.0f, deltatime);
+	if(keyboardSnapshot[SDL_SCANCODE_D]) camera.ProcessMouseMovement(10.0f, 0, deltatime);
+	if(keyboardSnapshot[SDL_SCANCODE_A]) camera.ProcessMouseMovement(-10.0f, 0, deltatime);
+	if(keyboardSnapshot[SDL_SCANCODE_L]) lightPos.x += 0.2;
+	if(keyboardSnapshot[SDL_SCANCODE_J]) lightPos.x	-= 0.2;
+	if(keyboardSnapshot[SDL_SCANCODE_I]) lightPos.y	+= 0.2;
+	if(keyboardSnapshot[SDL_SCANCODE_K]) lightPos.y	-= 0.2;
 
 }
 
@@ -214,20 +252,34 @@ unsigned int createTerrain(){
 		float curX = -15.0;
 		for(int j=0; j<300; j++){
 			curX+=0.1f;
+			glm::vec3 norm;
+			
+			glm::vec3 v1(glm::vec3(-0.1f + curX, sin(-0.1f + curX) + cos(0.1f + curZ), 0.1f + curZ) - glm::vec3(-0.1f + curX, sin(-0.1f + curX) + cos(-0.1f + curZ), -0.1f + curZ));
+			glm::vec3 v2(glm::vec3(0.1f + curX, sin(0.1f + curX) + cos(-0.1f + curZ), -0.1f + curZ) - glm::vec3(-0.1f + curX, sin(-0.1f + curX) + cos(-0.1f + curZ), -0.1f + curZ));
+			norm = glm::cross(v1, v2);
+			
 			vert.push_back(glm::vec3(-0.1f + curX, 0.5f, -0.1f + curZ));
+			vert.push_back(norm);
+			
 		    vert.push_back(glm::vec3(-0.1f + curX, 0.5f, 0.1f + curZ));
+			vert.push_back(norm);
+		   
 		    vert.push_back(glm::vec3(0.1f + curX, 0.5f, -0.1f + curZ));
+			vert.push_back(norm);
 
+
+			v1 = glm::vec3(glm::vec3(0.1f + curX, sin(0.1f + curX) + cos(0.1f + curZ), 0.1f + curZ) - glm::vec3(-0.1f + curX, sin(-0.1f + curX) + cos(0.1f + curZ), 0.1f + curZ));
+			v2 = glm::vec3(glm::vec3(0.1f + curX, sin(0.1f + curX) + cos(-0.1f + curZ), -0.1f + curZ) - glm::vec3(-0.1f + curX, sin(-0.1f + curX) + cos(0.1f + curZ), 0.1f + curZ));
+			norm = glm::cross(v1, v2);
 		    vert.push_back(glm::vec3(-0.1f + curX, 0.5f, 0.1f + curZ));
+			vert.push_back(norm);
 		    vert.push_back(glm::vec3(0.1f + curX, 0.5f, 0.1f + curZ));
+			vert.push_back(norm);
 		    vert.push_back(glm::vec3(0.1f + curX, 0.5f, -0.1f + curZ));	
+			vert.push_back(norm);
 		}
 	}	
 
-	unsigned int indices[] = {  // note that we start from 0!
-	    0, 1, 2,    // first triangle
-	    1, 3, 2      // second triangle
-	};
 
 	//------------------------------BUFFERS----------------------------------------//
 
@@ -246,8 +298,11 @@ unsigned int createTerrain(){
 	//Position attribute
 	
 
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);  
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0); 
+
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)(3*sizeof(float)));
+	glEnableVertexAttribArray(1); 
 	
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
@@ -280,6 +335,73 @@ unsigned int createAxes(){
 	glEnableVertexAttribArray(0);
 
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)(3*sizeof(float)));
+	glEnableVertexAttribArray(1);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+
+	return VAO;
+
+}
+
+unsigned int createLamp(){
+	float vertices[] = {
+		-0.5f, -0.5f, -0.5f, 1.0f, 1.0f, 1.0f, 
+		0.5f, -0.5f, -0.5f, 1.0f, 1.0f, 1.0f,  
+		0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 1.0f, 
+		0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 1.0f, 
+		-0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 1.0f, 
+		-0.5f, -0.5f, -0.5f, 1.0f, 1.0f, 1.0f,  
+
+		-0.5f, -0.5f,  0.5f, 1.0f, 1.0f, 1.0f, 
+		0.5f, -0.5f,  0.5f, 1.0f, 1.0f, 1.0f,  
+		0.5f,  0.5f,  0.5f, 1.0f, 1.0f, 1.0f, 
+		0.5f,  0.5f,  0.5f, 1.0f, 1.0f, 1.0f,  
+		-0.5f,  0.5f,  0.5f, 1.0f, 1.0f, 1.0f,  
+		-0.5f, -0.5f,  0.5f, 1.0f, 1.0f, 1.0f,  
+
+		-0.5f,  0.5f,  0.5f, 1.0f, 1.0f, 1.0f, 
+		-0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 1.0f, 
+		-0.5f, -0.5f, -0.5f, 1.0f, 1.0f, 1.0f, 
+		-0.5f, -0.5f, -0.5f, 1.0f, 1.0f, 1.0f, 
+		-0.5f, -0.5f,  0.5f, 1.0f, 1.0f, 1.0f, 
+		-0.5f,  0.5f,  0.5f, 1.0f, 1.0f, 1.0f, 
+
+		0.5f,  0.5f,  0.5f, 1.0f, 1.0f, 1.0f,  
+		0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 1.0f,  
+		0.5f, -0.5f, -0.5f, 1.0f, 1.0f, 1.0f, 
+		0.5f, -0.5f, -0.5f, 1.0f, 1.0f, 1.0f,  
+		0.5f, -0.5f,  0.5f, 1.0f, 1.0f, 1.0f, 
+		0.5f,  0.5f,  0.5f, 1.0f, 1.0f, 1.0f,  
+
+		-0.5f, -0.5f, -0.5f, 1.0f, 1.0f, 1.0f, 
+		0.5f, -0.5f, -0.5f, 1.0f, 1.0f, 1.0f, 
+		0.5f, -0.5f,  0.5f, 1.0f, 1.0f, 1.0f,  
+		0.5f, -0.5f,  0.5f, 1.0f, 1.0f, 1.0f, 
+		-0.5f, -0.5f,  0.5f, 1.0f, 1.0f, 1.0f,  
+		-0.5f, -0.5f, -0.5f, 1.0f, 1.0f, 1.0f, 
+
+		-0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 1.0f,  
+		0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 1.0f, 
+		0.5f,  0.5f,  0.5f, 1.0f, 1.0f, 1.0f, 
+		0.5f,  0.5f,  0.5f, 1.0f, 1.0f, 1.0f, 
+		-0.5f,  0.5f,  0.5f, 1.0f, 1.0f, 1.0f,  
+		-0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 1.0f
+	};
+
+	unsigned int VAO, VBO;
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
+
+	glGenBuffers(1, &VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)(3*sizeof(float)));
 	glEnableVertexAttribArray(1);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
