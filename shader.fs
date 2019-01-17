@@ -1,6 +1,7 @@
 #version 330 core
 out vec4 FragColor;
 uniform sampler2D texture1;
+uniform sampler2D texture2;
 
 uniform vec3 lightColor;
 uniform vec3 lightPos;
@@ -25,6 +26,6 @@ void main(){
     float ambientStrength = 0.1;
     vec3 ambient = ambientStrength * lightColor;
 
-    vec4 result = vec4(ambient + diffuse + specular, 1.0) *  texture(texture1, texCord);
+    vec4 result = vec4(ambient + diffuse + specular, 1.0) *  texture(texture2, texCord);
     FragColor = result;
 }

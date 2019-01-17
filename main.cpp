@@ -18,6 +18,8 @@ void ClearOpenGLErrors() {
 	
 }
 std::vector<glm::vec3> vert;
+std::vector<unsigned int> indices;
+unsigned int EBO;
 SDL_Window* mainwindow;
 SDL_GLContext maincontext;
 float deltatime = 0.0f;
@@ -49,7 +51,7 @@ int main(int argc, char* args[]){
 
 	unsigned int lampVAO = createLamp();
 
-	GLuint texture1;
+	GLuint texture1, texture2;
 	glGenTextures(1, &texture1);
 	glBindTexture(GL_TEXTURE_2D, texture1);
 	
@@ -62,8 +64,8 @@ int main(int argc, char* args[]){
     // load image, create texture and generate mipmaps
 	
     int width, height, nrChannels;
-    stbi_set_flip_vertically_on_load(true); // tell stb_image.h to flip loaded texture's on the y-axis.
-    unsigned char *data = stbi_load("cores.jpg", &width, &height, &nrChannels, 0);
+    //stbi_set_flip_vertically_on_load(true); // tell stb_image.h to flip loaded texture's on the y-axis.
+    unsigned char *data = stbi_load("heightmap.jpg", &width, &height, &nrChannels, 0);
 	
     if (data != NULL){
     	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -79,10 +81,38 @@ int main(int argc, char* args[]){
         std::cout << "Failed to load texture" << std::endl;
     }
     stbi_image_free(data);
+
+	 // texture 2
+    // ---------
+    glGenTextures(1, &texture2);
+    glBindTexture(GL_TEXTURE_2D, texture2);
+    // set the texture wrapping parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // set texture filtering parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // load image, create texture and generate mipmaps
+    data = stbi_load("ps_texture_1k.png", &width, &height, &nrChannels, 0);
+    if (data)
+    {
+        // note that the awesomeface.png has transparency and thus an alpha channel, so make sure to tell OpenGL the data type is of GL_RGBA
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+		GLenum error = glGetError();
+		if(error != GL_NO_ERROR) std::cout << gluErrorString(error)<<std::endl;
+    }
+    else
+    {
+        std::cout << "Failed to load texture" << std::endl;
+    }
+    stbi_image_free(data);
    
 	ourShader.use();
 	//ourShader.setInt("texture2", 1);
+	glUniform1i(glGetUniformLocation(ourShader.ID, "texture1"), 0);
 	ourShader.setVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
+	ourShader.setInt("texture2", 1);
 
 	glEnable(GL_DEPTH_TEST);
 	
@@ -102,6 +132,11 @@ int main(int argc, char* args[]){
 
 		glClearColor(0.2, 0.3f, 0.3f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture1);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, texture2);
 	
 		ourShader.use();
 		glBindVertexArray(VAO);
@@ -121,8 +156,10 @@ int main(int argc, char* args[]){
 
 		ourShader.setVec3("viewPos", camera.Position); 
 
-		glDrawArrays(GL_TRIANGLES, 0, vert.size());
-
+		//glDrawArrays(GL_POINTS, 0, vert.size());
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+		glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+		ClearOpenGLErrors();
 		our2Shader.use();
 
 		glBindVertexArray(VAO2);
@@ -213,6 +250,7 @@ bool Init(){
 		return false;
 	}
 
+	//glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
 	return true;
 }
 
@@ -244,41 +282,59 @@ void InputProcess(SDL_Event event){
 }
 
 unsigned int createTerrain(){
+	float min=4556465, max=0;
 	
-
-	float curZ = -15.0;
-	for(int i=0; i<300; i++){
-		curZ+=0.1;
+	float curZ = +15.0;
+	for(int i=0; i<150; i++){
+		curZ-=0.2;
 		float curX = -15.0;
-		for(int j=0; j<300; j++){
-			curX+=0.1f;
-			glm::vec3 norm;
-			
-			glm::vec3 v1(glm::vec3(-0.1f + curX, sin(-0.1f + curX) + cos(0.1f + curZ), 0.1f + curZ) - glm::vec3(-0.1f + curX, sin(-0.1f + curX) + cos(-0.1f + curZ), -0.1f + curZ));
-			glm::vec3 v2(glm::vec3(0.1f + curX, sin(0.1f + curX) + cos(-0.1f + curZ), -0.1f + curZ) - glm::vec3(-0.1f + curX, sin(-0.1f + curX) + cos(-0.1f + curZ), -0.1f + curZ));
-			norm = glm::cross(v1, v2);
-			
-			vert.push_back(glm::vec3(-0.1f + curX, 0.5f, -0.1f + curZ));
-			vert.push_back(norm);
-			
-		    vert.push_back(glm::vec3(-0.1f + curX, 0.5f, 0.1f + curZ));
-			vert.push_back(norm);
-		   
-		    vert.push_back(glm::vec3(0.1f + curX, 0.5f, -0.1f + curZ));
-			vert.push_back(norm);
+		if(curZ<min)
+			min=curX;
+		if(curZ>max)
+			max=curZ;	
+		for(int j=0; j<150; j++){
+			curX+=0.2f;
 
-
-			v1 = glm::vec3(glm::vec3(0.1f + curX, sin(0.1f + curX) + cos(0.1f + curZ), 0.1f + curZ) - glm::vec3(-0.1f + curX, sin(-0.1f + curX) + cos(0.1f + curZ), 0.1f + curZ));
-			v2 = glm::vec3(glm::vec3(0.1f + curX, sin(0.1f + curX) + cos(-0.1f + curZ), -0.1f + curZ) - glm::vec3(-0.1f + curX, sin(-0.1f + curX) + cos(0.1f + curZ), 0.1f + curZ));
-			norm = glm::cross(v1, v2);
-		    vert.push_back(glm::vec3(-0.1f + curX, 0.5f, 0.1f + curZ));
-			vert.push_back(norm);
-		    vert.push_back(glm::vec3(0.1f + curX, 0.5f, 0.1f + curZ));
-			vert.push_back(norm);
-		    vert.push_back(glm::vec3(0.1f + curX, 0.5f, -0.1f + curZ));	
-			vert.push_back(norm);
+			vert.push_back(glm::vec3(-0.2f + curX, 0.5f, -0.2f+curZ));
+			vert.push_back(glm::vec3(0.0f, 0.0f, 0.0f));
+		
+	
 		}
-	}	
+
+	}
+		std::cout<<vert.size()<<std::endl;
+	for(int i=0; i<149*150*2; i+=2){
+		if(vert[i].z != vert[i+2].z) continue;
+		if((i+2)%150==0) continue;
+		indices.push_back(i);
+		if(vert[i].x==0 && vert[i].z==0) std::cout<<"Erro: "<<i<<std::endl;
+		indices.push_back(i+2);
+		if(vert[i+2].x==0 && vert[i+2].z==0) std::cout<<"Erro: "<<i+2<<std::endl;
+		indices.push_back(i+(150*2));
+		if(vert[i+(150*2)].x==0 && vert[i+(150*2)].z==0) std::cout<<"Erro: "<<i+(150*2)<<std::endl;
+		indices.push_back(i+2);
+		if(vert[i+2].x==0 && vert[i+2].z==0) std::cout<<"Erro: "<<i+2<<std::endl;
+		indices.push_back((i+2)+(150*2));
+		if(vert[(i+2)+(150*2)].x==0 && vert[(i+2)+(150*2)].z==0) std::cout<<"Erro: "<<(i+2)+(150*2)<<std::endl;
+		indices.push_back(i+(150*2));
+		if(vert[i+(150*2)].x==0 && vert[i+(150*2)].z==0) std::cout<<"Erro: "<<i+(150*2)<<std::endl;
+		
+		//std::cout<<i<<" "<<i+2<<" "<<i+(150*2)<<" "<<i+2<<" "<<(i+2)+(150*2)<<" "<<i+(150*2)<<std::endl;
+		//std::cout<<vert[i].x<<" "<<vert[i].z<<"   -----  "<<vert[i+(150*2)].x<<" "<<vert[i+(150*2)].z<<"   -----  "<<vert[i+2].x<<" "<<vert[i+2].z<<std::endl;
+		
+	}
+
+	for(int i=0; i<indices.size(); i+=3){
+		glm::vec3 v1 = vert[indices[i+1]] - vert[indices[i]];
+		glm::vec3 v2 = vert[indices[i+2]] - vert[indices[i]];
+
+		glm::vec3 normal = glm::cross(v1, v2);
+		vert[indices[i]+1] += normal;
+		vert[indices[i+1]+1] += normal;
+		vert[indices[i+2]+1] += normal;  
+	}
+
+
 
 
 	//------------------------------BUFFERS----------------------------------------//
@@ -292,9 +348,9 @@ unsigned int createTerrain(){
 	glBufferData(GL_ARRAY_BUFFER, 3 * vert.size() * sizeof(float), &vert[0], GL_STATIC_DRAW);
 
 
-	//glGenBuffers(1, &EBO);
-	//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	//glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW); 
+	glGenBuffers(1, &EBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW); 
 	//Position attribute
 	
 
