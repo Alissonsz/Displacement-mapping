@@ -17,6 +17,7 @@ void ClearOpenGLErrors() {
 	}
 	
 }
+
 std::vector<glm::vec3> vert;
 std::vector<unsigned int> indices;
 unsigned int EBO;
@@ -27,16 +28,23 @@ float lastframe = 0.0f;
 bool running = true;
 glm::vec3 lightPos(-10.0f, 15.0f, 15.0f);
 Camera camera(glm::vec3(0.0, 5.0f, 6.0f));
+bool wireframe = false;
 
 bool Init();
 
 void InputProcess(SDL_Event event);
 
-unsigned int createTerrain();
+unsigned int createTerrain(const unsigned char* heightMap, int width);
 
 unsigned int createAxes();
 
 unsigned int createLamp();
+
+template <typename T, typename I, typename O>
+int MapInRange(T x, I in_min, I in_max, O out_min, O out_max)
+{
+	return (int)((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min);
+}
 
 int main(int argc, char* args[]){
 	std::cout<<"start"<<std::endl;
@@ -45,7 +53,6 @@ int main(int argc, char* args[]){
 	Shader ourShader("shader.vs", "shader.fs");
 	Shader our2Shader("shader2.vs", "shader2.fs");
 
-	unsigned int VAO = createTerrain();
 	
 	unsigned int VAO2 = createAxes();
 
@@ -66,7 +73,7 @@ int main(int argc, char* args[]){
     int width, height, nrChannels;
     //stbi_set_flip_vertically_on_load(true); // tell stb_image.h to flip loaded texture's on the y-axis.
     unsigned char *data = stbi_load("heightmap.jpg", &width, &height, &nrChannels, 0);
-	
+
     if (data != NULL){
     	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
@@ -77,10 +84,13 @@ int main(int argc, char* args[]){
 		GLenum error = glGetError();
 		if(error != GL_NO_ERROR) std::cout << gluErrorString(error)<<std::endl;
     }
-    else{
+    else {
         std::cout << "Failed to load texture" << std::endl;
     }
+
+	unsigned int VAO = createTerrain(data, 1025);
     stbi_image_free(data);
+
 
 	 // texture 2
     // ---------
@@ -94,6 +104,7 @@ int main(int argc, char* args[]){
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     // load image, create texture and generate mipmaps
     data = stbi_load("ps_texture_1k.png", &width, &height, &nrChannels, 0);
+
     if (data)
     {
         // note that the awesomeface.png has transparency and thus an alpha channel, so make sure to tell OpenGL the data type is of GL_RGBA
@@ -224,8 +235,8 @@ bool Init(){
 	    "Incrivel janela", 
 	    SDL_WINDOWPOS_CENTERED,
 	    SDL_WINDOWPOS_CENTERED,
-	    800,
-	    600,
+	    1366,
+	    768,
 	    SDL_WINDOW_OPENGL
 	);
 
@@ -278,64 +289,60 @@ void InputProcess(SDL_Event event){
 	if(keyboardSnapshot[SDL_SCANCODE_J]) lightPos.x	-= 0.2;
 	if(keyboardSnapshot[SDL_SCANCODE_I]) lightPos.y	+= 0.2;
 	if(keyboardSnapshot[SDL_SCANCODE_K]) lightPos.y	-= 0.2;
+	if(keyboardSnapshot[SDL_SCANCODE_M]) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	if(keyboardSnapshot[SDL_SCANCODE_N]) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 }
 
-unsigned int createTerrain(){
+unsigned int createTerrain(const unsigned char* heightMap, int width){
 	float min=4556465, max=0;
+	int nVerticesX, nVerticesY;
+	nVerticesX = nVerticesY = 150;
 	
 	float curZ = +15.0;
-	for(int i=0; i<150; i++){
+	for(int i=0; i<nVerticesX; i++){
 		curZ-=0.2;
 		float curX = -15.0;
 		if(curZ<min)
 			min=curX;
 		if(curZ>max)
 			max=curZ;	
-		for(int j=0; j<150; j++){
+		for(int j=0; j<nVerticesY; j++){
 			curX+=0.2f;
+			
+			int heightMapX = MapInRange(curX, -14.8f, 15.f, 0, 1024);
+			int heightMapZ = MapInRange(curZ, -15.f, 14.8f, 0, 1024);
 
-			vert.push_back(glm::vec3(-0.2f + curX, 0.5f, -0.2f+curZ));
+			int vertexHeight = heightMap[((heightMapZ * width + heightMapX) * 3)];
+			float curY = vertexHeight * 0.023;
+
+			vert.push_back(glm::vec3(curX, curY, curZ));
 			vert.push_back(glm::vec3(0.0f, 0.0f, 0.0f));
-		
-	
 		}
-
 	}
-		std::cout<<vert.size()<<std::endl;
-	for(int i=0; i<149*150*2; i+=2){
-		if(vert[i].z != vert[i+2].z) continue;
+
+	std::cout<<vert.size()<<std::endl;
+	for(int i=0; i < (nVerticesX - 1) * (nVerticesY); i+=1){
+		if(vert[i * 2].z != vert[(i * 2) + 2].z) continue;
 		if((i+2)%150==0) continue;
 		indices.push_back(i);
-		if(vert[i].x==0 && vert[i].z==0) std::cout<<"Erro: "<<i<<std::endl;
-		indices.push_back(i+2);
-		if(vert[i+2].x==0 && vert[i+2].z==0) std::cout<<"Erro: "<<i+2<<std::endl;
-		indices.push_back(i+(150*2));
-		if(vert[i+(150*2)].x==0 && vert[i+(150*2)].z==0) std::cout<<"Erro: "<<i+(150*2)<<std::endl;
-		indices.push_back(i+2);
-		if(vert[i+2].x==0 && vert[i+2].z==0) std::cout<<"Erro: "<<i+2<<std::endl;
-		indices.push_back((i+2)+(150*2));
-		if(vert[(i+2)+(150*2)].x==0 && vert[(i+2)+(150*2)].z==0) std::cout<<"Erro: "<<(i+2)+(150*2)<<std::endl;
-		indices.push_back(i+(150*2));
-		if(vert[i+(150*2)].x==0 && vert[i+(150*2)].z==0) std::cout<<"Erro: "<<i+(150*2)<<std::endl;
-		
-		//std::cout<<i<<" "<<i+2<<" "<<i+(150*2)<<" "<<i+2<<" "<<(i+2)+(150*2)<<" "<<i+(150*2)<<std::endl;
-		//std::cout<<vert[i].x<<" "<<vert[i].z<<"   -----  "<<vert[i+(150*2)].x<<" "<<vert[i+(150*2)].z<<"   -----  "<<vert[i+2].x<<" "<<vert[i+2].z<<std::endl;
-		
+		indices.push_back(i+1);
+		indices.push_back(i+(150));
+		indices.push_back(i+1);
+		indices.push_back(i + 1 + 150);
+		indices.push_back(i + 150);
 	}
 
-	for(int i=0; i<indices.size(); i+=3){
-		glm::vec3 v1 = vert[indices[i+1]] - vert[indices[i]];
-		glm::vec3 v2 = vert[indices[i+2]] - vert[indices[i]];
+	for(int i=0; i<indices.size(); i += 3){
+		glm::vec3 v1 = vert[indices[i+ 1] * 2] - vert[indices[i] * 2];
+		glm::vec3 v2 = vert[indices[i+ 2] * 2] - vert[indices[i] * 2];
 
 		glm::vec3 normal = glm::cross(v1, v2);
-		vert[indices[i]+1] += normal;
-		vert[indices[i+1]+1] += normal;
-		vert[indices[i+2]+1] += normal;  
+
+		vert[indices[i] * 2 + 1] += normal;
+		vert[indices[i+1] * 2 + 1] += normal;
+		vert[indices[i+2] * 2 + 1] += normal;  
 	}
-
-
-
 
 	//------------------------------BUFFERS----------------------------------------//
 
@@ -351,9 +358,8 @@ unsigned int createTerrain(){
 	glGenBuffers(1, &EBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW); 
-	//Position attribute
-	
 
+	//Position attribute
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0); 
 
@@ -397,7 +403,6 @@ unsigned int createAxes(){
 	glBindVertexArray(0);
 
 	return VAO;
-
 }
 
 unsigned int createLamp(){
@@ -464,5 +469,4 @@ unsigned int createLamp(){
 	glBindVertexArray(0);
 
 	return VAO;
-
 }
