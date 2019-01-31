@@ -17,7 +17,10 @@ void ClearOpenGLErrors() {
 	}
 	
 }
-
+unsigned char *data1;
+bool vertchangeup = false;
+bool vertchangedown = false;
+int VERTICES = 30;
 std::vector<glm::vec3> vert;
 std::vector<unsigned int> indices;
 unsigned int EBO;
@@ -72,14 +75,14 @@ int main(int argc, char* args[]){
 	
     int width, height, nrChannels;
     //stbi_set_flip_vertically_on_load(true); // tell stb_image.h to flip loaded texture's on the y-axis.
-    unsigned char *data = stbi_load("heightmap.jpg", &width, &height, &nrChannels, 0);
+    data1 = stbi_load("heightmap.jpg", &width, &height, &nrChannels, 0);
 
-    if (data != NULL){
+    if (data1 != NULL){
     	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 		glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
 		glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data1);
         glGenerateMipmap(GL_TEXTURE_2D);
 		GLenum error = glGetError();
 		if(error != GL_NO_ERROR) std::cout << gluErrorString(error)<<std::endl;
@@ -88,10 +91,10 @@ int main(int argc, char* args[]){
         std::cout << "Failed to load texture" << std::endl;
     }
 
-	unsigned int VAO = createTerrain(data, 1025);
-    stbi_image_free(data);
+	unsigned int VAO = createTerrain(data1, 1025);
+    
 
-
+	unsigned char *data;
 	 // texture 2
     // ---------
     glGenTextures(1, &texture2);
@@ -135,6 +138,20 @@ int main(int argc, char* args[]){
 
 	
 	while(running){
+		if(vertchangeup == true){
+			VERTICES*= 2;
+			if(VERTICES >= 150)
+				VERTICES = 150;
+			VAO = createTerrain(data1, 1025);
+			vertchangeup = false;
+		}
+		if(vertchangedown == true){
+			VERTICES/= 2;
+			if(VERTICES <= 15)
+				VERTICES = 15;
+			VAO = createTerrain(data1, 1025);
+			vertchangedown = false;
+		}
 		ClearOpenGLErrors();
 		SDL_Event event;
 		float currentframe = (float)SDL_GetTicks()/100;
@@ -274,6 +291,14 @@ void InputProcess(SDL_Event event){
 			running = false;
 
 		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) running = false;
+		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_x){
+			vertchangeup = true;
+			
+		}	
+		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_z){
+			vertchangedown = true;
+			
+		}
 
 	}
 
@@ -291,46 +316,53 @@ void InputProcess(SDL_Event event){
 	if(keyboardSnapshot[SDL_SCANCODE_K]) lightPos.y	-= 0.2;
 	if(keyboardSnapshot[SDL_SCANCODE_M]) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	if(keyboardSnapshot[SDL_SCANCODE_N]) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	
 
 }
 
 unsigned int createTerrain(const unsigned char* heightMap, int width){
+	vert.clear();
+	indices.clear();
 	float min=4556465, max=0;
 	int nVerticesX, nVerticesY;
-	nVerticesX = nVerticesY = 150;
+	nVerticesX = nVerticesY = VERTICES;
 	
-	float curZ = +15.0;
+	float curZ = +14.8;
 	for(int i=0; i<nVerticesX; i++){
-		curZ-=0.2;
-		float curX = -15.0;
-		if(curZ<min)
-			min=curX;
-		if(curZ>max)
-			max=curZ;	
+		
+		float curX = -14.8;
+	
 		for(int j=0; j<nVerticesY; j++){
-			curX+=0.2f;
 			
-			int heightMapX = MapInRange(curX, -14.8f, 15.f, 0, 1024);
-			int heightMapZ = MapInRange(curZ, -15.f, 14.8f, 0, 1024);
+			
+			int heightMapX = MapInRange(curX, -14.8f, 14.8f, 0, 1024);
+			int heightMapZ = MapInRange(curZ, -14.8f, 14.8f, 0, 1024);
 
 			int vertexHeight = heightMap[((heightMapZ * width + heightMapX) * 3)];
 			float curY = vertexHeight * 0.023;
 
 			vert.push_back(glm::vec3(curX, curY, curZ));
 			vert.push_back(glm::vec3(0.0f, 0.0f, 0.0f));
-		}
-	}
 
+			if(curZ<min)
+				min=curX;
+			if(curZ>max)
+				max=curZ;	
+			curX+=29.8 / nVerticesX;	
+		}
+		curZ-=29.8/nVerticesY;
+	}
+	
 	std::cout<<vert.size()<<std::endl;
 	for(int i=0; i < (nVerticesX - 1) * (nVerticesY); i+=1){
 		if(vert[i * 2].z != vert[(i * 2) + 2].z) continue;
 		if((i+2)%150==0) continue;
 		indices.push_back(i);
 		indices.push_back(i+1);
-		indices.push_back(i+(150));
+		indices.push_back(i+(nVerticesX));
 		indices.push_back(i+1);
-		indices.push_back(i + 1 + 150);
-		indices.push_back(i + 150);
+		indices.push_back(i + 1 + nVerticesX);
+		indices.push_back(i + nVerticesX);
 	}
 
 	for(int i=0; i<indices.size(); i += 3){
