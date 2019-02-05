@@ -20,7 +20,7 @@ void ClearOpenGLErrors() {
 unsigned char *data1;
 bool vertchangeup = false;
 bool vertchangedown = false;
-int VERTICES = 30;
+int VERTICES = 12;
 std::vector<glm::vec3> vert;
 std::vector<unsigned int> indices;
 unsigned int EBO;
@@ -139,7 +139,8 @@ int main(int argc, char* args[]){
 	
 	while(running){
 		if(vertchangeup == true){
-			VERTICES*= 2;
+			VERTICES*=1.5;
+			std::cout<<VERTICES<<std::endl;
 			if(VERTICES >= 150)
 				VERTICES = 150;
 			VAO = createTerrain(data1, 1025);
@@ -353,10 +354,10 @@ unsigned int createTerrain(const unsigned char* heightMap, int width){
 		curZ-=29.8/nVerticesY;
 	}
 	
-	std::cout<<vert.size()<<std::endl;
+	
 	for(int i=0; i < (nVerticesX - 1) * (nVerticesY); i+=1){
 		if(vert[i * 2].z != vert[(i * 2) + 2].z) continue;
-		if((i+2)%150==0) continue;
+		//if((i+2)%150==0) continue;
 		indices.push_back(i);
 		indices.push_back(i+1);
 		indices.push_back(i+(nVerticesX));
