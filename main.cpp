@@ -20,7 +20,8 @@ void ClearOpenGLErrors() {
 unsigned char *data1;
 bool vertchangeup = false;
 bool vertchangedown = false;
-int VERTICES = 12;
+std::vector<unsigned char> normalsVec;
+int VERTICES = 10;
 std::vector<glm::vec3> vert;
 std::vector<unsigned int> indices;
 unsigned int EBO;
@@ -43,25 +44,30 @@ unsigned int createAxes();
 
 unsigned int createLamp();
 
+void createNormalMap(const unsigned char* heightMap, int width);
+
 template <typename T, typename I, typename O>
 int MapInRange(T x, I in_min, I in_max, O out_min, O out_max)
 {
+	if(x < in_min) x = in_min;
+	if(x > in_max) x = in_max;
 	return (int)((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min);
 }
-
+bool sucessoo = Init();
+Shader ourShader("shader.vs", "shader.fs");
+Shader our2Shader("shader2.vs", "shader2.fs");
 int main(int argc, char* args[]){
 	std::cout<<"start"<<std::endl;
-	Init();
 	
-	Shader ourShader("shader.vs", "shader.fs");
-	Shader our2Shader("shader2.vs", "shader2.fs");
-
+	
+	
+	ourShader.use();
 	
 	unsigned int VAO2 = createAxes();
 
 	unsigned int lampVAO = createLamp();
 
-	GLuint texture1, texture2;
+	GLuint texture1, texture2, normalTexture;
 	glGenTextures(1, &texture1);
 	glBindTexture(GL_TEXTURE_2D, texture1);
 	
@@ -90,7 +96,7 @@ int main(int argc, char* args[]){
     else {
         std::cout << "Failed to load texture" << std::endl;
     }
-
+	createNormalMap(data1, 1025);
 	unsigned int VAO = createTerrain(data1, 1025);
     
 
@@ -121,12 +127,28 @@ int main(int argc, char* args[]){
         std::cout << "Failed to load texture" << std::endl;
     }
     stbi_image_free(data);
+
+	glGenTextures(1, &normalTexture);
+	glBindTexture(GL_TEXTURE_2D, normalTexture);
+	if (normalsVec.data() != NULL){
+    	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+		glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+		glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1025, 1025, 0, GL_RGB, GL_UNSIGNED_BYTE, normalsVec.data());
+        glGenerateMipmap(GL_TEXTURE_2D);
+		GLenum error = glGetError();
+		if(error != GL_NO_ERROR) std::cout << gluErrorString(error)<<std::endl;
+    }
+    else {
+        std::cout << "Failed to load texture" << std::endl;
+    }
    
 	ourShader.use();
-	//ourShader.setInt("texture2", 1);
 	glUniform1i(glGetUniformLocation(ourShader.ID, "texture1"), 0);
 	ourShader.setVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
 	ourShader.setInt("texture2", 1);
+	ourShader.setInt("normalTexture", 2);
 
 	glEnable(GL_DEPTH_TEST);
 	
@@ -141,15 +163,14 @@ int main(int argc, char* args[]){
 		if(vertchangeup == true){
 			VERTICES*=1.5;
 			std::cout<<VERTICES<<std::endl;
-			if(VERTICES >= 150)
-				VERTICES = 150;
+			
 			VAO = createTerrain(data1, 1025);
 			vertchangeup = false;
 		}
 		if(vertchangedown == true){
 			VERTICES/= 2;
-			if(VERTICES <= 15)
-				VERTICES = 15;
+			if(VERTICES <= 6)
+				VERTICES = 6;
 			VAO = createTerrain(data1, 1025);
 			vertchangedown = false;
 		}
@@ -166,6 +187,8 @@ int main(int argc, char* args[]){
         glBindTexture(GL_TEXTURE_2D, texture1);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, texture2);
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, normalTexture);
 	
 		ourShader.use();
 		glBindVertexArray(VAO);
@@ -324,7 +347,6 @@ void InputProcess(SDL_Event event){
 unsigned int createTerrain(const unsigned char* heightMap, int width){
 	vert.clear();
 	indices.clear();
-	float min=4556465, max=0;
 	int nVerticesX, nVerticesY;
 	nVerticesX = nVerticesY = VERTICES;
 	
@@ -338,17 +360,17 @@ unsigned int createTerrain(const unsigned char* heightMap, int width){
 			
 			int heightMapX = MapInRange(curX, -14.8f, 14.8f, 0, 1024);
 			int heightMapZ = MapInRange(curZ, -14.8f, 14.8f, 0, 1024);
-
+			if(heightMapX > 1024){
+				std::cout<<"Out of range = "<<heightMapX<<" "<<curX<<std::endl;
+			}
 			int vertexHeight = heightMap[((heightMapZ * width + heightMapX) * 3)];
 			float curY = vertexHeight * 0.023;
+			
 
 			vert.push_back(glm::vec3(curX, curY, curZ));
 			vert.push_back(glm::vec3(0.0f, 0.0f, 0.0f));
 
-			if(curZ<min)
-				min=curX;
-			if(curZ>max)
-				max=curZ;	
+	
 			curX+=29.8 / nVerticesX;	
 		}
 		curZ-=29.8/nVerticesY;
@@ -365,17 +387,25 @@ unsigned int createTerrain(const unsigned char* heightMap, int width){
 		indices.push_back(i + 1 + nVerticesX);
 		indices.push_back(i + nVerticesX);
 	}
-
+	float nMin = 5465484, nMax = -50;
 	for(int i=0; i<indices.size(); i += 3){
 		glm::vec3 v1 = vert[indices[i+ 1] * 2] - vert[indices[i] * 2];
 		glm::vec3 v2 = vert[indices[i+ 2] * 2] - vert[indices[i] * 2];
+		//std::cout<<vert[indices[i+ 2] * 2].x<<" "<<vert[indices[i] * 2].x<<std::endl;
 
 		glm::vec3 normal = glm::cross(v1, v2);
 
 		vert[indices[i] * 2 + 1] += normal;
 		vert[indices[i+1] * 2 + 1] += normal;
-		vert[indices[i+2] * 2 + 1] += normal;  
+		vert[indices[i+2] * 2 + 1] += normal;
+  
 	}
+	
+
+	//for(int i=0; i< 900; i+=3) std::cout<<(unsigned int)normalsVec[i]<<" "<<(unsigned int)normalsVec[i+1]<<" "<<(unsigned int)normalsVec[i+2]<<std::endl;
+	
+
+
 
 	//------------------------------BUFFERS----------------------------------------//
 
@@ -403,6 +433,92 @@ unsigned int createTerrain(const unsigned char* heightMap, int width){
 	glBindVertexArray(0);
 
 	return VAO;
+}
+
+void createNormalMap(const unsigned char* heightMap, int width){
+	int nVerticesX, nVerticesY;
+	nVerticesX = nVerticesY = 1025;
+	float curZ = +14.8;
+	for(int i=0; i<nVerticesX; i++){
+		
+		float curX = -14.8;
+	
+		for(int j=0; j<nVerticesY; j++){
+			
+			
+			int heightMapX = MapInRange(curX, -14.8f, 14.8f, 0, 1024);
+			int heightMapZ = MapInRange(curZ, -14.8f, 14.8f, 0, 1024);
+			if(heightMapX > 1024){
+				std::cout<<"Out of range = "<<heightMapX<<" "<<curX<<std::endl;
+			}
+			int vertexHeight = heightMap[((heightMapZ * width + heightMapX) * 3)];
+			float curY = vertexHeight * 0.023;
+			
+
+			vert.push_back(glm::vec3(curX, curY, curZ));
+			vert.push_back(glm::vec3(0.0f, 0.0f, 0.0f));
+
+	
+			curX+=29.8 / nVerticesX;	
+		}
+		curZ-=29.8/nVerticesY;
+	}
+	std::cout<<"Create vertices"<<std::endl;
+	
+	
+	for(int i=0; i < (nVerticesX - 1) * (nVerticesY); i+=1){
+		if(vert[i * 2].z != vert[(i * 2) + 2].z) continue;
+		//if((i+2)%150==0) continue;
+		indices.push_back(i);
+		indices.push_back(i+1);
+		indices.push_back(i+(nVerticesX));
+		indices.push_back(i+1);
+		indices.push_back(i + 1 + nVerticesX);
+		indices.push_back(i + nVerticesX);
+	}
+	float nMin = 5465484, nMax = -50;
+	for(int i=0; i<indices.size(); i += 3){
+		glm::vec3 v1 = vert[indices[i+ 1] * 2] - vert[indices[i] * 2];
+		glm::vec3 v2 = vert[indices[i+ 2] * 2] - vert[indices[i] * 2];
+		//std::cout<<vert[indices[i+ 2] * 2].x<<" "<<vert[indices[i] * 2].x<<std::endl;
+
+		glm::vec3 normal = glm::cross(v1, v2);
+
+		vert[indices[i] * 2 + 1] += normal;
+		vert[indices[i+1] * 2 + 1] += normal;
+		vert[indices[i+2] * 2 + 1] += normal;
+		if(vert[indices[i] * 2 + 1].x > nMax) nMax = vert[indices[i] * 2 + 1].x;
+		if(vert[indices[i] * 2 + 1].x < nMin) nMin = vert[indices[i] * 2 + 1].x;
+		if(vert[indices[i] * 2 + 1].y > nMax) nMax = vert[indices[i] * 2 + 1].y;
+		if(vert[indices[i] * 2 + 1].y < nMin) nMin = vert[indices[i] * 2 + 1].y;
+		if(vert[indices[i] * 2 + 1].z > nMax) nMax = vert[indices[i] * 2 + 1].z;
+		if(vert[indices[i] * 2 + 1].z < nMin) nMin = vert[indices[i] * 2 + 1].z;
+
+		if(vert[indices[i+1] * 2 + 1].x > nMax) nMax = vert[indices[i+1] * 2 + 1].x;
+		if(vert[indices[i+1] * 2 + 1].x < nMin) nMin = vert[indices[i+1] * 2 + 1].x;
+		if(vert[indices[i+1] * 2 + 1].y > nMax) nMax = vert[indices[i+1] * 2 + 1].y;
+		if(vert[indices[i+1] * 2 + 1].y < nMin) nMin = vert[indices[i+1] * 2 + 1].y;
+		if(vert[indices[i+1] * 2 + 1].z > nMax) nMax = vert[indices[i+1] * 2 + 1].z;
+		if(vert[indices[i+1] * 2 + 1].z < nMin) nMin = vert[indices[i+1] * 2 + 1].z;
+
+		if(vert[indices[i+2] * 2 + 1].x > nMax) nMax = vert[indices[i+2] * 2 + 1].x;
+		if(vert[indices[i+2] * 2 + 1].x < nMin) nMin = vert[indices[i+2] * 2 + 1].x;
+		if(vert[indices[i+2] * 2 + 1].y > nMax) nMax = vert[indices[i+2] * 2 + 1].y;
+		if(vert[indices[i+2] * 2 + 1].y < nMin) nMin = vert[indices[i+2] * 2 + 1].y;
+		if(vert[indices[i+2] * 2 + 1].z > nMax) nMax = vert[indices[i+2] * 2 + 1].z;
+		if(vert[indices[i+2] * 2 + 1].z < nMin) nMin = vert[indices[i+2] * 2 + 1].z;
+  
+	}
+	
+	float min = 15455, max = -800;
+	for(int i=1; i<vert.size(); i += 2){
+		//std::cout<<vert[i].x<<" "<<vert[i].y<<" "<<vert[i].z<<std::endl;
+		normalsVec.push_back((unsigned char)MapInRange(vert[i].x, nMin, nMax, 0, 255));
+		normalsVec.push_back((unsigned char)MapInRange(vert[i].y, nMin, nMax, 0, 255));
+		normalsVec.push_back((unsigned char)MapInRange(vert[i].z, nMin, nMax, 0, 255));
+
+  
+	}
 }
 
 unsigned int createAxes(){
