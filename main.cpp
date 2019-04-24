@@ -491,8 +491,8 @@ unsigned int createTerrain(const unsigned char* heightMap, int width){
 		indices.push_back(i + 1 + nVerticesX);
 		indices.push_back(i + nVerticesX);
 	}
-	float nMin = 5465484, nMax = -50;
-	for(int i=0; i<indices.size(); i += 3){
+//	float nMin = 5465484, nMax = -50;
+	for(unsigned int i=0; i<indices.size(); i += 3){
 		glm::vec3 v1 = vert[indices[i+ 1] * 2] - vert[indices[i] * 2];
 		glm::vec3 v2 = vert[indices[i+ 2] * 2] - vert[indices[i] * 2];
 		//std::cout<<vert[indices[i+ 2] * 2].x<<" "<<vert[indices[i] * 2].x<<std::endl;
@@ -581,7 +581,7 @@ void createNormalMap(const unsigned char* heightMap, int width){
 		indices.push_back(i + nVerticesX);
 	}
 	float nMin = 5465484, nMax = -50;
-	for(int i=0; i<indices.size(); i += 3){
+	for(unsigned int i=0; i<indices.size(); i += 3){
 		glm::vec3 v1 = vert[indices[i+ 1] * 2] - vert[indices[i] * 2];
 		glm::vec3 v2 = vert[indices[i+ 2] * 2] - vert[indices[i] * 2];
 		//std::cout<<vert[indices[i+ 2] * 2].x<<" "<<vert[indices[i] * 2].x<<std::endl;
@@ -614,8 +614,8 @@ void createNormalMap(const unsigned char* heightMap, int width){
   
 	}
 	
-	float min = 15455, max = -800;
-	for(int i=1; i<vert.size(); i += 2){
+//	float min = 15455, max = -800;
+	for(unsigned int i=1; i<vert.size(); i += 2){
 		//std::cout<<vert[i].x<<" "<<vert[i].y<<" "<<vert[i].z<<std::endl;
 		normalsVec.push_back((unsigned char)MapInRange(vert[i].x, nMin, nMax, 0, 255));
 		normalsVec.push_back((unsigned char)MapInRange(vert[i].y, nMin, nMax, 0, 255));
