@@ -7,6 +7,8 @@ uniform sampler2D normalTexture;
 uniform vec3 lightPos;
 uniform vec3 viewPos;
 uniform int parFlag = 0;
+uniform int binaryIter = 5;
+
 
 
 /*in vec2 texCord;
@@ -20,6 +22,32 @@ in VS_OUT {
     vec3 TangentViewPos;
     vec3 TangentFragPos;
 } fs_in;
+
+vec2 parallaxBinarySearch(vec2 texCoords, vec3 viewDir){
+    vec2 P = viewDir.xy * 0.3;
+
+    vec2 prevCoords = texCoords;
+    texCoords = texCoords + P;
+    P = prevCoords;
+
+    vec2 uvin = texCoords;
+    vec2 uvout = P;
+
+    vec2 currentCoords;
+    float Hmax = 1.0f;
+    float Hmin = 0.0f;
+
+    for(int i=0; i<binaryIter; i++){
+        float H = (Hmin + Hmax)/2; // middle
+        currentCoords = uvin * H + uvout * (1 - H);
+        float h = texture(texture1, currentCoords).r;
+        
+        if(H <= h) Hmin = H;
+        else Hmax = H;
+    }
+
+    return currentCoords;
+}
 
 vec2 parallaxMapping(vec2 texCoords, vec3 viewDir){ 
     // number of depth layers
@@ -82,8 +110,10 @@ void main() {
     
     vec3 viewDir = normalize(fs_in.TangentViewPos - fs_in.TangentFragPos);
     if(texCoords.x < 0.0 || texCoords.y < 0.0) discard;
-    if(parFlag == 1)
+    else if(parFlag == 1)
         texCoords = parallaxMapping(fs_in.TexCoords, viewDir);
+    else if(parFlag == 2)
+        texCoords = parallaxBinarySearch(fs_in.TexCoords, viewDir);
     if(texCoords.x > 1.0 || texCoords.y > 1.0 || texCoords.x < 0.0 || texCoords.y < 0.0)
        discard;
 

@@ -33,6 +33,9 @@ bool running = true;
 glm::vec3 lightPos(-10.0f, 15.0f, 15.0f);
 Camera camera(glm::vec3(0.0, 20.0f, 30.0f));
 bool wireframe = false;
+int lastx = 1366/2, lasty = 768/2;
+bool firstmouse = true;
+int BINARYITER = 5;
 
 void renderQuad();
 bool Init();
@@ -209,10 +212,7 @@ int main(int argc, char* args[]){
 
 		ourShader.setVec3("viewPos", camera.Position); 
 
-		//glDrawArrays(GL_POINTS, 0, vert.size());
-		/*glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-		glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
-		ClearOpenGLErrors();*/
+	
 		renderQuad();
 		our2Shader.use();
 
@@ -225,8 +225,7 @@ int main(int argc, char* args[]){
 		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
 		glm::mat4 model2 = glm::mat4(1.0);
-		/*model2 = glm::translate(model2, glm::vec3(0.0f, 3.0f, 0.0f));
-		model2 = glm::scale(model2, glm::vec3(1.0f));*/
+		
 		modelLoc = glGetUniformLocation(our2Shader.ID, "model");
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model2));
 
@@ -311,7 +310,7 @@ bool Init(){
 void InputProcess(SDL_Event event){
 
 	const Uint8* keyboardSnapshot = SDL_GetKeyboardState(NULL);
-
+	int x, y;
 	while(SDL_PollEvent(&event)){
 		if(event.type == SDL_QUIT)
 			running = false;
@@ -326,16 +325,44 @@ void InputProcess(SDL_Event event){
 			
 		}
 
+		if(SDL_GetMouseState(&x, &y) & SDL_BUTTON(SDL_BUTTON_LEFT)){
+			if(firstmouse == true){
+				lastx = x;
+        		lasty = y;
+				firstmouse = false;
+			}
+
+			camera.ProcessMouseMovement(x - lastx, lasty - y, deltatime);
+			lastx = x;
+			lasty = y;
+		} else {
+			lastx = x;
+        	lasty = y;
+		}	
+		
+
 	}
 
-	if(keyboardSnapshot[SDL_SCANCODE_UP]) camera.ProcessKeyboard(FORWARD, deltatime);
-	if(keyboardSnapshot[SDL_SCANCODE_DOWN]) camera.ProcessKeyboard(BACKWARD, deltatime);
-	if(keyboardSnapshot[SDL_SCANCODE_RIGHT]) camera.ProcessKeyboard(RIGHT, deltatime);
-	if(keyboardSnapshot[SDL_SCANCODE_LEFT]) camera.ProcessKeyboard(LEFT, deltatime);
-	if(keyboardSnapshot[SDL_SCANCODE_W]) camera.ProcessMouseMovement(0, 10.0f, deltatime);
+	if(keyboardSnapshot[SDL_SCANCODE_W]) camera.ProcessKeyboard(FORWARD, deltatime);
+	if(keyboardSnapshot[SDL_SCANCODE_S]) camera.ProcessKeyboard(BACKWARD, deltatime);
+	if(keyboardSnapshot[SDL_SCANCODE_D]) camera.ProcessKeyboard(RIGHT, deltatime);
+	if(keyboardSnapshot[SDL_SCANCODE_A]) camera.ProcessKeyboard(LEFT, deltatime);
+	if(keyboardSnapshot[SDL_SCANCODE_KP_PLUS]){
+		ourShader.use();
+		BINARYITER++;
+		std::cout<<"Binary shearch num Iterations = "<<BINARYITER<<std::endl;
+		ourShader.setInt("binaryIter", BINARYITER);
+	}
+	if(keyboardSnapshot[SDL_SCANCODE_KP_MINUS]){
+		ourShader.use();
+		BINARYITER--;
+		std::cout<<"Binary shearch num Iterations = "<<BINARYITER<<std::endl;
+		ourShader.setInt("binaryIter", BINARYITER);
+	}  
+	/*if(keyboardSnapshot[SDL_SCANCODE_W]) camera.ProcessMouseMovement(0, 10.0f, deltatime);
 	if(keyboardSnapshot[SDL_SCANCODE_S]) camera.ProcessMouseMovement(0, -10.0f, deltatime);
 	if(keyboardSnapshot[SDL_SCANCODE_D]) camera.ProcessMouseMovement(10.0f, 0, deltatime);
-	if(keyboardSnapshot[SDL_SCANCODE_A]) camera.ProcessMouseMovement(-10.0f, 0, deltatime);
+	if(keyboardSnapshot[SDL_SCANCODE_A]) camera.ProcessMouseMovement(-10.0f, 0, deltatime);*/
 	if(keyboardSnapshot[SDL_SCANCODE_L]) lightPos.x += 1.0f * deltatime;
 	if(keyboardSnapshot[SDL_SCANCODE_J]) lightPos.x	-= 1.0f * deltatime;
 	if(keyboardSnapshot[SDL_SCANCODE_I]) lightPos.y	+= 1.0f * deltatime;
@@ -345,6 +372,10 @@ void InputProcess(SDL_Event event){
 	if(keyboardSnapshot[SDL_SCANCODE_P]){
 		ourShader.use();
 		ourShader.setInt("parFlag", 1);
+	}
+	if(keyboardSnapshot[SDL_SCANCODE_B]){
+		ourShader.use();
+		ourShader.setInt("parFlag", 2);
 	}
 	if(keyboardSnapshot[SDL_SCANCODE_Q]){
 		ourShader.use();
