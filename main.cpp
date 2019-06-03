@@ -30,7 +30,7 @@ SDL_GLContext maincontext;
 float deltatime = 0.0f;
 float lastframe = 0.0f;
 bool running = true;
-glm::vec3 lightPos(-10.0f, 15.0f, 15.0f);
+glm::vec3 lightPos(0.0f, 10.0f, 0.0f);
 Camera camera(glm::vec3(0.0, 20.0f, 30.0f));
 bool wireframe = false;
 int lastx = 1366/2, lasty = 768/2;
@@ -338,8 +338,23 @@ void InputProcess(SDL_Event event){
 		} else {
 			lastx = x;
         	lasty = y;
-		}	
+		}
 		
+		if(SDL_GetMouseState(&x, &y) & SDL_BUTTON(SDL_BUTTON_MIDDLE)){
+			std::cout<<"teste mem"<<std::endl;
+			if(firstmouse == true){
+				lastx = x;
+        		lasty = y;
+				firstmouse = false;
+			}
+
+			camera.ProcessMouseScroll(lasty - y);
+			lastx = x;
+			lasty = y;
+			} else {
+				lastx = x;
+				lasty = y;
+			}		
 
 	}
 
@@ -365,8 +380,8 @@ void InputProcess(SDL_Event event){
 	if(keyboardSnapshot[SDL_SCANCODE_A]) camera.ProcessMouseMovement(-10.0f, 0, deltatime);*/
 	if(keyboardSnapshot[SDL_SCANCODE_L]) lightPos.x += 1.0f * deltatime;
 	if(keyboardSnapshot[SDL_SCANCODE_J]) lightPos.x	-= 1.0f * deltatime;
-	if(keyboardSnapshot[SDL_SCANCODE_I]) lightPos.y	+= 1.0f * deltatime;
-	if(keyboardSnapshot[SDL_SCANCODE_K]) lightPos.y	-= 1.0f * deltatime;
+	if(keyboardSnapshot[SDL_SCANCODE_I]) lightPos.z	+= 1.0f * deltatime;
+	if(keyboardSnapshot[SDL_SCANCODE_K]) lightPos.z	-= 1.0f * deltatime;
 	if(keyboardSnapshot[SDL_SCANCODE_M]) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	if(keyboardSnapshot[SDL_SCANCODE_N]) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	if(keyboardSnapshot[SDL_SCANCODE_P]){
